@@ -1,0 +1,12 @@
+version: '3'
+services:
+  front:
+    build: .
+    command: sh -c "npm start"
+    ports:
+      - "3000:3000"
+    restart: always
+    environment:
+      - REACT_APP_MAPBOX_TOKEN=$REACT_APP_MAPBOX_TOKEN
+    volumes:
+    - .:/code
