@@ -8,5 +8,6 @@ services:
     restart: always
     environment:
       - REACT_APP_MAPBOX_TOKEN=$REACT_APP_MAPBOX_TOKEN
-    volumes:
-    - .:/code
+      - REACT_APP_URL_RESOURCES=$REACT_APP_URL_RESOURCES
+    # volumes:
+    # - .:/code
