@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import municipios from './municipios.json';
 import Papa from 'papaparse';
@@ -23,6 +23,46 @@ function filterCsvByParams(objects, params, puntero) {
     return 'NaN';
 }
 
+
+function getDimensions(dsd){
+    return [...dsd.data.dataStructures[0].dataStructureComponents.dimensionList.dimensions, ...dsd.data.dataStructures[0].dataStructureComponents.dimensionList.timeDimensions];
+}
+
+function getParamName(urn, dsd) {
+    for (const codelist of dsd.data.codelists) {
+        if (codelist.links[0].urn === urn) {
+            return codelist.name;
+        }
+    }
+    console.log(urn);
+    return '';
+}
+
+
+function getUrnCL(param, dimensions){
+    console.log(param);
+    for (const dimension of dimensions) {
+        if (dimension.id === param) {
+            return dimension.localRepresentation.enumeration;
+        }
+    }
+}
+
+function getCodeName(urn, codeId, dsd){
+    let codes;
+    console.log(urn);
+    for (const codelist of dsd.data.codelists) {
+        if (codelist.links[0].urn === urn) {
+            codes = codelist.codes;
+        }
+    }
+    for (const code of codes){
+        if (code.id === codeId){
+            return code.name;
+        }
+    }
+}
+
 export default function Map() {
     const map = useRef(null);
     const mapContainer = useRef(null);
@@ -31,7 +71,8 @@ export default function Map() {
     const csvParams = {};
     const allValues = {};
     const punteros = {};
-
+    // const [dsd, setDSD] = useState(null);
+    let dsd;
     useEffect(() => {
         if (map.current) return;
         map.current = new mapboxgl.Map({
@@ -45,15 +86,21 @@ export default function Map() {
     useEffect(() => {
         if (!map.current) return;
         const dataset = urlParams.get('dataset');
-        const resource = urlParams.get('resource');
-        const fileName = urlParams.get('file-name')
-        const url = `${URL_RESOURCES}${dataset}/resource/${resource}/download/${fileName}`;
-        fetch(url)
+        const resourceCsv = urlParams.get('resource-csv');
+        const fileNameCsv = urlParams.get('file-name-csv')
+        const urlCsv = `${URL_RESOURCES}${dataset}/resource/${resourceCsv}/download/${fileNameCsv}`;
+        const resourceJson = urlParams.get('resource-json');
+        const fileNameJson = urlParams.get('file-name-json');
+        const urlJson = `${URL_RESOURCES}${dataset}/resource/${resourceJson}/download/${fileNameJson}`;
+        console.log(urlJson);
+        fetch(urlJson).then(response => response.json()).then(jsonData => { dsd = jsonData; console.log(jsonData) }).catch(error => { console.log(error) });
+        console.log(dsd);
+        fetch(urlCsv)
             .then(response => response.text())
             .then(csvData => {
                 Papa.parse(csvData, {
                     complete: function (results) {
-                        
+
                         for (let i = 0; i < results.data[0].length; i++) {
                             let columnName = results.data[0][i];
                             punteros[columnName] = i;
@@ -69,13 +116,11 @@ export default function Map() {
                             const codMun = obj.properties.cod_mun;
                             obj.properties.value = parseFloat(filterCsvByParams(csvLookup[codMun], csvParams, punteros.OBS_VALUE));
                         });
-
                         for (const param in csvParams) {
                             allValues[param] = Array.from(new Set(results.data.map(subArray => subArray[punteros[param]])));
                             allValues[param].shift();
                             allValues[param].pop();
                         }
-                        console.log(allValues);
                     }
                 })
             })
@@ -121,21 +166,25 @@ export default function Map() {
             });
             const filter = document.getElementById('filter');
             for (const param in csvParams) {
+                const dimensions = getDimensions(dsd);
+                const urnCl = getUrnCL(param, dimensions)
+                const paramName = getParamName(urnCl, dsd);
                 const paramSelect = document.createElement('select');
                 const paramText = document.createElement('p');
-                
+
                 paramSelect.setAttribute('param', param);
                 for (const paramValues of allValues[param]) {
                     const option = document.createElement('option');
+                    option.setAttribute('code',paramValues);
+                    // option.textContent = getCodeName(urnCl, paramValues, dsd);
                     option.textContent = paramValues;
                     paramSelect.appendChild(option);
                 }
-                paramText.textContent = param;
-                paramSelect.addEventListener('change', event=>{
+                paramText.textContent = paramName;
+                paramSelect.addEventListener('change', event => {
                     const selectedOption = event.target.value;
                     const selectedParam = paramSelect.getAttribute('param');
                     csvParams[selectedParam] = selectedOption;
-                    console.log(csvParams);
                     municipios.features.forEach(obj => {
                         const codMun = obj.properties.cod_mun;
                         obj.properties.value = parseFloat(filterCsvByParams(csvLookup[codMun], csvParams, punteros.OBS_VALUE));
