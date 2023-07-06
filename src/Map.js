@@ -3,92 +3,25 @@ import mapboxgl from "mapbox-gl";
 import municipios from './municipios.json';
 import provincias from './provincias.json';
 import Papa from 'papaparse';
-require('dotenv').config()
+import { getStops, filterCsvByParams, getDimensions, getUrnCL, getCodelist, getParamName, getCodeName, getPunteros, getCodToKeep, getAllValues, populatePoligonos, updateMap } from './Utils';
 
+
+require('dotenv').config()
 const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN;
 const URL_RESOURCES = process.env.REACT_APP_URL_RESOURCES;
 mapboxgl.accessToken = MAPBOX_TOKEN;
-
-function getStops(poligonos) {
-    const maxValueToPrint = poligonos.features.reduce((maxValue, obj) => {
-        return obj.properties.value > maxValue ? obj.properties.value : maxValue;
-    }, -Infinity);
-    const minValueToPrint = poligonos.features.reduce((maxValue, obj) => {
-        return obj.properties.value < maxValue ? obj.properties.value : maxValue;
-    }, Infinity);
-    return [
-        [minValueToPrint, '#ffdac8'],
-        [minValueToPrint + ((maxValueToPrint - minValueToPrint) * 1 / 5), '#FFCCCC'],
-        [minValueToPrint + ((maxValueToPrint - minValueToPrint) * 2 / 5), '#FF9999'],
-        [minValueToPrint + ((maxValueToPrint - minValueToPrint) * 3 / 5), '#FF6666'],
-        [minValueToPrint + ((maxValueToPrint - minValueToPrint) * 4 / 5), '#FF3333']
-    ];
-}
-function filterCsvByParams(objects, params, puntero) {
-    if (!objects) return null;
-    let hasAllParams;
-    for (const obj of objects) {
-        hasAllParams = true
-        for (const key in params) {
-            hasAllParams = hasAllParams && obj.includes(params[key]);
-        }
-
-        if (hasAllParams) {
-            return obj[puntero];
-        }
-    }
-    return 'NaN';
-}
-
-
-function getDimensions(dsd) {
-    return [...dsd.data.dataStructures[0].dataStructureComponents.dimensionList.dimensions];
-}
-
-function getParamName(codelist) {
-    return codelist.name;
-}
-
-
-function getUrnCL(param, dimensions) {
-    if (param === "TIME_PERIOD") return param;
-    for (const dimension of dimensions) {
-        if (dimension.id === param) {
-            return dimension.localRepresentation.enumeration;
-        }
-    }
-}
-
-function getCodelist(urn, dsd) {
-    if (urn === 'TIME_PERIOD') return { 'name': 'Año' };
-    for (const codelist of dsd.data.codelists) {
-        if (codelist.links[0].urn === urn) {
-            return codelist;
-        }
-    }
-}
-
-function getCodeName(codelist, codeId) {
-    if (codelist.name === 'Año') return codeId;
-    for (const code of codelist.codes) {
-        if (code.id === codeId) {
-            return code.name;
-        }
-    }
-}
 
 export default function Map() {
     const map = useRef(null);
     const mapContainer = useRef(null);
     const urlParams = new URLSearchParams(window.location.search);
-    const csvLookup = {};
-    const csvParams = {};
-    const allValues = {};
-    const punteros = {};
+    let csvLookup = {};
+    let csvParams = {};
+    let allValues = {};
+    let punteros = {};
     let dsd = {};
     const [legendValues, setLegendValues] = useState([[0], [0], [0], [0], [0]]);
-    // const [poligonos, setPoligonos] = useState({});
-    let poligonos;
+    let poligonos = provincias;
 
     useEffect(() => {
         if (map.current) return;
@@ -98,54 +31,38 @@ export default function Map() {
             center: [-5.984040411639227, 37.38862867862967],
             zoom: 7.0
         });
-    }, []);
+    }, [map]);
 
     useEffect(() => {
         if (!map.current) return;
         const dataset = urlParams.get('dataset');
         const resourceCsv = urlParams.get('resource-csv');
-        const fileNameCsv = urlParams.get('file-name-csv');
-        const urlCsv = `${URL_RESOURCES}${dataset}/resource/${resourceCsv}/download/${fileNameCsv}`;
+        const urlCsv = `${URL_RESOURCES}${dataset}/resource/${resourceCsv}/download`;
         const resourceJson = urlParams.get('resource-json');
-        const fileNameJson = urlParams.get('file-name-json');
-        const urlJson = `${URL_RESOURCES}${dataset}/resource/${resourceJson}/download/${fileNameJson}`;
-        poligonos = provincias;
-        fetch(urlJson).then(response => response.json()).then(jsonData => { dsd = jsonData; console.log(jsonData); }).catch(error => { console.log(error) });
+        const urlJson = `${URL_RESOURCES}${dataset}/resource/${resourceJson}/download`;
+        fetch(urlJson).then(response => response.json()).then(jsonData => { dsd = jsonData;}).catch(error => { console.log(error) });
         fetch(urlCsv)
             .then(response => response.text())
             .then(csvData => {
                 Papa.parse(csvData, {
                     complete: function (results) {
-                        console.log(poligonos);
-                        for (let i = 0; i < results.data[0].length; i++) {
-                            let columnName = results.data[0][i];
-                            punteros[columnName] = i;
-                            if (columnName !== 'TERRITORIO' && columnName !== 'OBS_VALUE') {
-                                csvParams[columnName] = results.data[1][i];
+                        punteros = getPunteros(results);
+                        for (const puntero in punteros){
+                            if (puntero !== 'TERRITORIO' && puntero !== 'OBS_VALUE') {
+                                csvParams[puntero] = results.data[1][punteros[puntero]];
                             }
                         }
-                        delete csvParams['OBS_STATUS'];
-                        const codToKeep = [];
-                        for (const poligono of poligonos.features) {
-                            codToKeep[codToKeep.length] = poligono.properties.cod;
-                        }
+                        const codToKeep = getCodToKeep(municipios, provincias);
+
                         results.data.forEach(row => {
-                            console.log(codToKeep.indexOf(row[punteros.TERRITORIO]));
                             if (codToKeep.indexOf(row[punteros.TERRITORIO]) !== -1) {
                                 if (!csvLookup[row[punteros.TERRITORIO]]) csvLookup[row[punteros.TERRITORIO]] = [];
                                 csvLookup[row[punteros.TERRITORIO]][csvLookup[row[punteros.TERRITORIO]].length] = row;
                             }
                         });
-                        poligonos.features.forEach(obj => {
-                            const cod = obj.properties.cod;
-                            obj.properties.value = parseFloat(filterCsvByParams(csvLookup[cod], csvParams, punteros.OBS_VALUE));
-                        });
                         console.log(csvLookup);
-                        for (const param in csvParams) {
-                            allValues[param] = Array.from(new Set(results.data.map(subArray => subArray[punteros[param]])));
-                            allValues[param].shift();
-                            allValues[param].pop();
-                        }
+                        populatePoligonos(poligonos, csvLookup, csvParams, punteros)
+                        allValues = getAllValues(csvParams, results, punteros);
                     }
                 })
             })
@@ -157,7 +74,7 @@ export default function Map() {
         if (!map.current) return;
         if (!dsd) return;
         if (!csvLookup) return;
-        
+
         const popup = new mapboxgl.Popup({
             closeButton: false
         });
@@ -217,16 +134,22 @@ export default function Map() {
                     const selectedOption = selectedOptionTag.getAttribute('code');
                     const selectedParam = paramSelect.getAttribute('param');
                     csvParams[selectedParam] = selectedOption;
-                    poligonos.features.forEach(obj => {
-                        const codMun = obj.properties.cod;
-                        obj.properties.value = parseFloat(filterCsvByParams(csvLookup[codMun], csvParams, punteros.OBS_VALUE));
-                    });
-                    map.current.getSource('dataset-source').setData(poligonos);
-                    setLegendValues(getStops(poligonos));
-                    map.current.setPaintProperty('dataset-layer-fill', 'fill-color', {
-                        "property": "value",
-                        "stops": getStops(poligonos)
-                    });
+
+                    populatePoligonos(poligonos, csvLookup, csvParams, punteros);
+                    updateMap(poligonos, map, setLegendValues);
+                });
+
+                const selectProMun = document.getElementById('provmun');
+                selectProMun.addEventListener('change', event =>{
+                    const newPoligonos = event.target.value;
+                    if (newPoligonos ==='Provincias'){
+                        poligonos = provincias;
+                    }else{
+                        poligonos = municipios;
+                    }
+                    populatePoligonos(poligonos, csvLookup, csvParams, punteros);
+                    updateMap(poligonos, map, setLegendValues);
+                    
                 });
                 filter.appendChild(paramText);
                 filter.appendChild(paramSelect);
@@ -237,7 +160,7 @@ export default function Map() {
             const feature = e.features[0];
             popup
                 .setLngLat(e.lngLat)
-                .setHTML(`<p>${feature.properties.nombre}<p/><p>${feature.properties.value}<p/>`
+                .setHTML(`<p>${feature.properties.nombre}</p><p>${feature.properties.value}</p>`
                 )
                 .addTo(map.current);
 
@@ -246,22 +169,31 @@ export default function Map() {
             map.current.getCanvas().style.cursor = '';
             popup.remove();
         });
-    }, [dsd. csvLookup]);
+    }, [dsd.csvLookup, poligonos]);
     return (
         <div>
             <div ref={mapContainer} className="map-container" id='map-container' />
-            <div className="filter" id="filter" />
+            <div className="filter" id="filter" >
+                <select id='provmun'>
+                    <option value="Provincias">
+                        Provincias
+                    </option>
+                    <option value="Municipios">
+                        Municipios
+                    </option>
+                </select>
+            </div>
             <nav className="legend" id="legend" >
                 <span style={{ 'background': '#ffdac8' }}></span>
                 <span style={{ 'background': '#FFCCCC' }}></span>
                 <span style={{ 'background': '#FF9999' }}></span>
                 <span style={{ 'background': '#FF6666' }}></span>
                 <span style={{ 'background': '#FF3333' }}></span>
-                <label>{legendValues[0][0]}</label>
+                <label>&lt;{legendValues[0][0]}</label>
                 <label>{legendValues[1][0]}</label>
                 <label>{legendValues[2][0]}</label>
                 <label>{legendValues[3][0]}</label>
-                <label>{legendValues[4][0]}</label>
+                <label>&gt;{legendValues[4][0]}</label>
             </nav>
         </div>
     );
