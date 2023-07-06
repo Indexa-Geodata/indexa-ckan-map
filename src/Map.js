@@ -3,7 +3,6 @@ import mapboxgl from "mapbox-gl";
 import municipios from './municipios.json';
 import provincias from './provincias.json';
 import Papa from 'papaparse';
-import 'bootstrap/dist/css/bootstrap.css';
 require('dotenv').config()
 
 const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN;
@@ -33,6 +32,7 @@ function filterCsvByParams(objects, params, puntero) {
         for (const key in params) {
             hasAllParams = hasAllParams && obj.includes(params[key]);
         }
+
         if (hasAllParams) {
             return obj[puntero];
         }
@@ -85,9 +85,10 @@ export default function Map() {
     const csvParams = {};
     const allValues = {};
     const punteros = {};
-    let poligonos = {};
-    let dsd;
-    const [legendValues, setLegendValues] = useState([]);
+    let dsd = {};
+    const [legendValues, setLegendValues] = useState([[0], [0], [0], [0], [0]]);
+    // const [poligonos, setPoligonos] = useState({});
+    let poligonos;
 
     useEffect(() => {
         if (map.current) return;
@@ -108,18 +109,14 @@ export default function Map() {
         const resourceJson = urlParams.get('resource-json');
         const fileNameJson = urlParams.get('file-name-json');
         const urlJson = `${URL_RESOURCES}${dataset}/resource/${resourceJson}/download/${fileNameJson}`;
-
-        const popup = new mapboxgl.Popup({
-            closeButton: false
-        });
-
+        poligonos = provincias;
         fetch(urlJson).then(response => response.json()).then(jsonData => { dsd = jsonData; console.log(jsonData); }).catch(error => { console.log(error) });
         fetch(urlCsv)
             .then(response => response.text())
             .then(csvData => {
                 Papa.parse(csvData, {
                     complete: function (results) {
-
+                        console.log(poligonos);
                         for (let i = 0; i < results.data[0].length; i++) {
                             let columnName = results.data[0][i];
                             punteros[columnName] = i;
@@ -128,20 +125,20 @@ export default function Map() {
                             }
                         }
                         delete csvParams['OBS_STATUS'];
-                        poligonos = provincias;
                         const codToKeep = [];
                         for (const poligono of poligonos.features) {
                             codToKeep[codToKeep.length] = poligono.properties.cod;
                         }
                         results.data.forEach(row => {
+                            console.log(codToKeep.indexOf(row[punteros.TERRITORIO]));
                             if (codToKeep.indexOf(row[punteros.TERRITORIO]) !== -1) {
                                 if (!csvLookup[row[punteros.TERRITORIO]]) csvLookup[row[punteros.TERRITORIO]] = [];
                                 csvLookup[row[punteros.TERRITORIO]][csvLookup[row[punteros.TERRITORIO]].length] = row;
                             }
                         });
                         poligonos.features.forEach(obj => {
-                            const codMun = obj.properties.cod;
-                            obj.properties.value = parseFloat(filterCsvByParams(csvLookup[codMun], csvParams, punteros.OBS_VALUE));
+                            const cod = obj.properties.cod;
+                            obj.properties.value = parseFloat(filterCsvByParams(csvLookup[cod], csvParams, punteros.OBS_VALUE));
                         });
                         console.log(csvLookup);
                         for (const param in csvParams) {
@@ -155,13 +152,22 @@ export default function Map() {
             .catch(error => {
                 console.error('Error:', error);
             });
+    }, []);
+    useEffect(() => {
+        if (!map.current) return;
+        if (!dsd) return;
+        if (!csvLookup) return;
+        
+        const popup = new mapboxgl.Popup({
+            closeButton: false
+        });
         map.current.on('load', () => {
             console.log(poligonos);
             map.current.addSource('dataset-source', {
                 'type': 'geojson',
                 'data': poligonos,
             });
-
+            setLegendValues(getStops(poligonos));
             map.current.addLayer({
                 "id": "dataset-layer-fill",
                 "source": 'dataset-source',
@@ -185,6 +191,7 @@ export default function Map() {
                     "line-opacity": 0.2
                 }
             });
+
             const filter = document.getElementById('filter');
             for (const param in csvParams) {
                 if (allValues[param].length <= 1) continue;
@@ -215,6 +222,7 @@ export default function Map() {
                         obj.properties.value = parseFloat(filterCsvByParams(csvLookup[codMun], csvParams, punteros.OBS_VALUE));
                     });
                     map.current.getSource('dataset-source').setData(poligonos);
+                    setLegendValues(getStops(poligonos));
                     map.current.setPaintProperty('dataset-layer-fill', 'fill-color', {
                         "property": "value",
                         "stops": getStops(poligonos)
@@ -238,22 +246,22 @@ export default function Map() {
             map.current.getCanvas().style.cursor = '';
             popup.remove();
         });
-    }, []);
+    }, [dsd. csvLookup]);
     return (
         <div>
             <div ref={mapContainer} className="map-container" id='map-container' />
             <div className="filter" id="filter" />
             <nav className="legend" id="legend" >
-                <span style={{'background':'#ffdac8'}}></span>
-                <span style={{'background':'#FFCCCC'}}></span>
-                <span style={{'background':'#FF9999'}}></span>
-                <span style={{'background':'#FF6666'}}></span>
-                <span style={{'background':'#FF3333'}}></span>
-                <label>0</label>
-                <label>1</label>
-                <label>2</label>
-                <label>3</label>
-                <label>4</label>
+                <span style={{ 'background': '#ffdac8' }}></span>
+                <span style={{ 'background': '#FFCCCC' }}></span>
+                <span style={{ 'background': '#FF9999' }}></span>
+                <span style={{ 'background': '#FF6666' }}></span>
+                <span style={{ 'background': '#FF3333' }}></span>
+                <label>{legendValues[0][0]}</label>
+                <label>{legendValues[1][0]}</label>
+                <label>{legendValues[2][0]}</label>
+                <label>{legendValues[3][0]}</label>
+                <label>{legendValues[4][0]}</label>
             </nav>
         </div>
     );
