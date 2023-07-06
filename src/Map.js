@@ -5,8 +5,6 @@ import provincias from './provincias.json';
 import Papa from 'papaparse';
 import { getStops, filterCsvByParams, getDimensions, getUrnCL, getCodelist, getParamName, getCodeName, getPunteros, getCodToKeep, getAllValues, populatePoligonos, updateMap } from './Utils';
 
-
-require('dotenv').config()
 const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN;
 const URL_RESOURCES = process.env.REACT_APP_URL_RESOURCES;
 mapboxgl.accessToken = MAPBOX_TOKEN;
