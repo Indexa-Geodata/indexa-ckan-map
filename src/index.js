@@ -1,12 +1,12 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import Map from './Map';
+import App from './App';
 import './index.css';
 
 ReactDOM.render(
     <React.StrictMode>
-        <Map />
+        <App />
     </React.StrictMode>,
     document.getElementById('body')
 );
