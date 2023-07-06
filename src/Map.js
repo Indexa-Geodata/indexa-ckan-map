@@ -23,6 +23,7 @@ export default function Map() {
 
     useEffect(() => {
         if (map.current) return;
+        console.log(process.env);
         map.current = new mapboxgl.Map({
             container: mapContainer.current,
             style: 'mapbox://styles/mapbox/dark-v11',
