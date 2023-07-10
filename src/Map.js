@@ -23,7 +23,6 @@ export default function Map() {
 
     useEffect(() => {
         if (map.current) return;
-        console.log(process.env);
         map.current = new mapboxgl.Map({
             container: mapContainer.current,
             style: 'mapbox://styles/mapbox/dark-v11',
@@ -59,7 +58,6 @@ export default function Map() {
                                 csvLookup[row[punteros.TERRITORIO]][csvLookup[row[punteros.TERRITORIO]].length] = row;
                             }
                         });
-                        console.log(csvLookup);
                         populatePoligonos(poligonos, csvLookup, csvParams, punteros)
                         allValues = getAllValues(csvParams, results, punteros);
                     }
@@ -78,7 +76,6 @@ export default function Map() {
             closeButton: false
         });
         map.current.on('load', () => {
-            console.log(poligonos);
             map.current.addSource('dataset-source', {
                 'type': 'geojson',
                 'data': poligonos,
