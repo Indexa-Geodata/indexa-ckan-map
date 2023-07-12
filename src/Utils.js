@@ -6,14 +6,14 @@ export function getStops(poligonos) {
         return obj.properties.value < maxValue ? obj.properties.value : maxValue;
     }, Infinity);
     return [
-        [minValueToPrint, '#ffdac8'],
-        [Math.round(minValueToPrint + ((maxValueToPrint - minValueToPrint) * 1 / 5)), '#FFCCCC'],
-        [Math.round(minValueToPrint + ((maxValueToPrint - minValueToPrint) * 2 / 5)), '#FF9999'],
-        [Math.round(minValueToPrint + ((maxValueToPrint - minValueToPrint) * 3 / 5)), '#FF6666'],
-        [Math.round(minValueToPrint + ((maxValueToPrint - minValueToPrint) * 4 / 5)), '#FF3333']
+        [Math.round(minValueToPrint * 100) / 100, '#ffdac8'],
+        [Math.round((minValueToPrint + ((maxValueToPrint - minValueToPrint) * 1 / 5)) * 100) / 100, '#FFCCCC'],
+        [Math.round((minValueToPrint + ((maxValueToPrint - minValueToPrint) * 2 / 5)) * 100) / 100, '#FF9999'],
+        [Math.round((minValueToPrint + ((maxValueToPrint - minValueToPrint) * 3 / 5)) * 100) / 100, '#FF6666'],
+        [Math.round((minValueToPrint + ((maxValueToPrint - minValueToPrint) * 4 / 5)) * 100) / 100, '#FF3333']
     ];
 }
-export function filterCsvByParams(objects, params, puntero) {
+function filterCsvByParams(objects, params, puntero) {
     if (!objects) return 'NaN';
     let hasAllParams;
     for (const obj of objects) {
@@ -98,8 +98,11 @@ export function getAllValues(csvParams, results, punteros) {
 export function populatePoligonos(poligonos, csvLookup, csvParams, punteros) {
     poligonos.features.forEach(obj => {
         const cod = obj.properties.cod;
-        obj.properties.value = parseFloat(filterCsvByParams(csvLookup[cod], csvParams, punteros.OBS_VALUE));
+        // console.log(filterCsvByParams(csvLookup[cod], csvParams, punteros.OBS_VALUE));
+        const value = parseFloat(filterCsvByParams(csvLookup[cod], csvParams, punteros.OBS_VALUE).replace(',', '.'));
+        obj.properties.value = Math.round(value * 100) / 100;
     });
+    console.log(poligonos);
 }
 
 export function updateMap(poligonos, map, setLegendValues) {

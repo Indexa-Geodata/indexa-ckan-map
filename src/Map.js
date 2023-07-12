@@ -3,7 +3,7 @@ import mapboxgl from "mapbox-gl";
 import municipios from './municipios.json';
 import provincias from './provincias.json';
 import Papa from 'papaparse';
-import { getStops, filterCsvByParams, getDimensions, getUrnCL, getCodelist, getParamName, getCodeName, getPunteros, getCodToKeep, getAllValues, populatePoligonos, updateMap } from './Utils';
+import { getStops, getDimensions, getUrnCL, getCodelist, getParamName, getCodeName, getPunteros, getCodToKeep, getAllValues, populatePoligonos, updateMap } from './Utils';
 
 const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN;
 const URL_RESOURCES = process.env.REACT_APP_URL_RESOURCES;
@@ -58,7 +58,20 @@ export default function Map() {
                                 csvLookup[row[punteros.TERRITORIO]][csvLookup[row[punteros.TERRITORIO]].length] = row;
                             }
                         });
-                        populatePoligonos(poligonos, csvLookup, csvParams, punteros)
+                        const firstPolygon = csvLookup.keys()[0];
+                        let dataHasProvincias = false;
+                        for(const provincia in provincias.features){
+                            if(provincia.properties.cod === firstPolygon){
+                                dataHasProvincias = true;
+                                break;
+                            }
+                        }
+                        if(dataHasProvincias){
+                            poligonos = provincias;
+                        }else{
+                            poligonos = municipios;
+                        }
+                        populatePoligonos(poligonos, csvLookup, csvParams, punteros);
                         allValues = getAllValues(csvParams, results, punteros);
                     }
                 })
@@ -124,7 +137,7 @@ export default function Map() {
                     option.textContent = getCodeName(codelist, paramValues);
                     paramSelect.appendChild(option);
                 }
-                paramText.textContent = paramName;
+                paramText.textContent = `${paramName}:`;
                 paramSelect.addEventListener('change', event => {
                     const selectedOptionTag = event.target.selectedOptions[0];
                     const selectedOption = selectedOptionTag.getAttribute('code');
@@ -170,6 +183,7 @@ export default function Map() {
         <div>
             <div ref={mapContainer} className="map-container" id='map-container' />
             <div className="filter" id="filter" >
+                <p>Unidad territorial:</p>
                 <select id='provmun'>
                     <option value="Provincias">
                         Provincias
@@ -185,11 +199,11 @@ export default function Map() {
                 <span style={{ 'background': '#FF9999' }}></span>
                 <span style={{ 'background': '#FF6666' }}></span>
                 <span style={{ 'background': '#FF3333' }}></span>
-                <label>&lt;{legendValues[0][0]}</label>
+                <label>&lt;={legendValues[0][0]}</label>
                 <label>{legendValues[1][0]}</label>
                 <label>{legendValues[2][0]}</label>
                 <label>{legendValues[3][0]}</label>
-                <label>&gt;{legendValues[4][0]}</label>
+                <label>&gt;={legendValues[4][0]}</label>
             </nav>
         </div>
     );
