@@ -10,6 +10,7 @@
     "env-cmd": "^10.1.0",
     "mapbox-gl": "^2.14.1",
     "papaparse": "^5.4.1",
+    "rainbowvis.js": "^1.1.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router": "^6.14.1",

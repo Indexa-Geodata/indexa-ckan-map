@@ -3,7 +3,7 @@ import mapboxgl from "mapbox-gl";
 import municipios from './municipios.json';
 import provincias from './provincias.json';
 import Papa from 'papaparse';
-import { getStops, getDimensions, getUrnCL, getCodelist, getParamName, getCodeName, getPunteros, getCodToKeep, getAllValues, populatePoligonos, updateMap } from './Utils';
+import { getStops, getDimensions, getUrnCL, getCodelist, getParamName, getCodeName, getPunteros, getCodToKeep, getAllValues, populatePoligonos, updateMap, getValueMapping } from './Utils';
 
 const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN;
 const URL_RESOURCES = process.env.REACT_APP_URL_RESOURCES;
@@ -17,15 +17,21 @@ export default function Map() {
     const csvParams = {};
     let allValues = {};
     let punteros = {};
-    // const [results, setResults] = useState(null);
-    // const [dsd, setDsd] = useState(null);
     let dsd = {};
     const [legendValues, setLegendValues] = useState([[0], [0], [0], [0], [0]]);
     let poligonos = provincias;
     let territorioName = null;
+    let alfaNumerico = false;
+    const dataset = urlParams.get('dataset');
+    const resourceCsv = urlParams.get('resource-csv');
+    const urlCsv = `${URL_RESOURCES}${dataset}/resource/${resourceCsv}/download`;
+    const resourceJson = urlParams.get('resource-json');
+    const urlJson = `${URL_RESOURCES}${dataset}/resource/${resourceJson}/download`;
+    let valueMapping = {};
+    // const [stops, setStops] = useState(null );
 
     useEffect(() => {
-        if (!(map.current || Object.keys(allValues) === 0)) {
+        if (!(map.current)) {
             map.current = new mapboxgl.Map({
                 container: mapContainer.current,
                 style: 'mapbox://styles/mapbox/dark-v11',
@@ -33,11 +39,16 @@ export default function Map() {
                 zoom: 7.0
             });
         }
-    }, [map, allValues]);
+    }, [map]);
+
+    // useEffect(() =>{
+    //     setStops(getStops(poligonos, alfaNumerico));
+    //     setLegendValues(stops);
+    // }, [poligonos, alfaNumerico]);
 
     const fetchJson = (urlJson) => {
         if (Object.keys(dsd) !== 0)
-            fetch(urlJson).then(response => response.json()).then(jsonData => { dsd =jsonData;}).catch(error => { console.error(error) });
+            fetch(urlJson).then(response => response.json()).then(jsonData => { dsd = jsonData; }).catch(error => { console.error(error) });
     };
 
     const fetchCsv = (urlCsv) => {
@@ -47,13 +58,16 @@ export default function Map() {
                 .then(csvData => {
                     Papa.parse(csvData, {
                         complete: function (results) {
-                            // setResults(results);
                             punteros = getPunteros(results);
                             for (const puntero in punteros) {
-                                if(puntero.includes('TERRITORIO'))
+                                if (puntero.includes('TERRITORIO'))
                                     territorioName = puntero
                                 if (!puntero.includes('TERRITORIO') && puntero !== 'OBS_VALUE') {
-                                    csvParams[puntero] = results.data[1][punteros[puntero]];                                
+                                    csvParams[puntero] = results.data[1][punteros[puntero]];
+                                }
+                                if (puntero === 'OBS_VALUE') {
+                                    if (isNaN(parseFloat(results.data[1][punteros[puntero]])))
+                                        alfaNumerico = true;
                                 }
                             }
                             const codToKeep = getCodToKeep(municipios, provincias);
@@ -76,8 +90,10 @@ export default function Map() {
                             } else {
                                 poligonos = municipios;
                             }
-
-                            populatePoligonos(poligonos, csvLookup, csvParams, punteros);
+                            if (alfaNumerico) {
+                                valueMapping = getValueMapping(results.data.map(obj => obj[punteros.OBS_VALUE]));
+                            }
+                            populatePoligonos(poligonos, csvLookup, csvParams, punteros, alfaNumerico, valueMapping);
                             allValues = getAllValues(csvParams, results, punteros);
                         }
                     })
@@ -94,6 +110,7 @@ export default function Map() {
         for (const param in csvParams) {
             if (allValues[param].length <= 1) continue;
             const dimensions = getDimensions(dsd);
+            // console.log(dimensions);
             const urnCl = getUrnCL(param, dimensions);
             const codelist = getCodelist(urnCl, dsd);
             const paramName = getParamName(codelist);
@@ -116,8 +133,8 @@ export default function Map() {
                 const selectedParam = paramSelect.getAttribute('param');
                 csvParams[selectedParam] = selectedOption;
 
-                populatePoligonos(poligonos, csvLookup, csvParams, punteros);
-                updateMap(poligonos, map, setLegendValues);
+                populatePoligonos(poligonos, csvLookup, csvParams, punteros, alfaNumerico, valueMapping);
+                updateMap(poligonos, map, setLegendValues, alfaNumerico, valueMapping);
             });
 
             const selectProMun = document.getElementById('provmun');
@@ -128,23 +145,16 @@ export default function Map() {
                 } else {
                     poligonos = municipios;
                 }
-                populatePoligonos(poligonos, csvLookup, csvParams, punteros);
-                updateMap(poligonos, map, setLegendValues);
+                populatePoligonos(poligonos, csvLookup, csvParams, punteros, alfaNumerico, valueMapping);
+                updateMap(poligonos, map, setLegendValues, alfaNumerico, valueMapping);
 
             });
             filter.appendChild(paramText);
             filter.appendChild(paramSelect);
         }
     };
-    
     useEffect(() => {
         if (!map.current) return;
-        const dataset = urlParams.get('dataset');
-        const resourceCsv = urlParams.get('resource-csv');
-        const urlCsv = `${URL_RESOURCES}${dataset}/resource/${resourceCsv}/download`;
-        const resourceJson = urlParams.get('resource-json');
-        const urlJson = `${URL_RESOURCES}${dataset}/resource/${resourceJson}/download`;
-
         fetchJson(urlJson);
         fetchCsv(urlCsv);
 
@@ -153,13 +163,15 @@ export default function Map() {
         const popup = new mapboxgl.Popup({
             closeButton: false
         });
+        console.log(valueMapping);
         map.current.on('load', () => {
             createFilters();
+            const stops = getStops(poligonos, alfaNumerico, valueMapping);
+            setLegendValues(stops);
             map.current.addSource('dataset-source', {
                 'type': 'geojson',
                 'data': poligonos,
             });
-            setLegendValues(getStops(poligonos));
             map.current.addLayer({
                 "id": "dataset-layer-fill",
                 "source": 'dataset-source',
@@ -168,7 +180,7 @@ export default function Map() {
                     "fill-color":
                     {
                         "property": "value",
-                        "stops": getStops(poligonos)
+                        "stops": stops
                     },
                     "fill-opacity": 0.6
                 }
@@ -187,10 +199,11 @@ export default function Map() {
         });
         map.current.on('mousemove', 'dataset-layer-fill', (e) => {
             map.current.getCanvas().style.cursor = 'pointer';
-            const feature = e.features[0];
+            const feature = e.features[0]
+
             popup
                 .setLngLat(e.lngLat)
-                .setHTML(`<p>${feature.properties.nombre}</p><p>${feature.properties.value}</p>`
+                .setHTML(`<p>${feature.properties.nombre}</p><p>${feature.properties.display}</p>`
                 )
                 .addTo(map.current);
 
@@ -199,8 +212,25 @@ export default function Map() {
             map.current.getCanvas().style.cursor = '';
             popup.remove();
         });
-        
-    }, [map, dsd, csvLookup, poligonos, allValues, csvParams]);
+    }, [map, dsd, csvLookup, poligonos, allValues, csvParams, alfaNumerico, createFilters, fetchCsv, fetchJson, urlCsv, urlJson, valueMapping]);
+
+    const displayLegend = (legendValues) => {
+        console.log(valueMapping);
+        return (
+            <>
+                <div className="colores">
+                    {legendValues.map((item) => (
+                        <span style={{ 'background': item[1], width: '' + (1 / legendValues.length) * 100 + '%' }}></span>
+                    ))}
+                </div>
+                <div className="labeles">
+                    {legendValues.map((item) => (
+                        <label style={{ width: '' + (1 / legendValues.length) * 100 + '%' }}> {item[0]}</label>
+                    ))}
+                </div>
+            </>
+        );
+    };
 
     return (
         <div>
@@ -216,17 +246,8 @@ export default function Map() {
                     </option>
                 </select>
             </div>
-            <nav className="legend" id="legend" >
-                <span style={{ 'background': '#ffdac8' }}></span>
-                <span style={{ 'background': '#FFCCCC' }}></span>
-                <span style={{ 'background': '#FF9999' }}></span>
-                <span style={{ 'background': '#FF6666' }}></span>
-                <span style={{ 'background': '#FF3333' }}></span>
-                <label>&lt;={legendValues[0][0]}</label>
-                <label>{legendValues[1][0]}</label>
-                <label>{legendValues[2][0]}</label>
-                <label>{legendValues[3][0]}</label>
-                <label>&gt;={legendValues[4][0]}</label>
+            <nav className="legend" id="legend">
+                {displayLegend(legendValues)}
             </nav>
         </div>
     );

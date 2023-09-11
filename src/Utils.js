@@ -1,17 +1,34 @@
-export function getStops(poligonos) {
-    const maxValueToPrint = poligonos.features.reduce((maxValue, obj) => {
-        return obj.properties.value > maxValue ? obj.properties.value : maxValue;
-    }, -Infinity);
-    const minValueToPrint = poligonos.features.reduce((maxValue, obj) => {
-        return obj.properties.value < maxValue ? obj.properties.value : maxValue;
-    }, Infinity);
-    return [
-        [Math.round(minValueToPrint * 100) / 100, '#ffdac8'],
-        [Math.round((minValueToPrint + ((maxValueToPrint - minValueToPrint) * 1 / 4)) * 100) / 100, '#FFCCCC'],
-        [Math.round((minValueToPrint + ((maxValueToPrint - minValueToPrint) * 2 / 4)) * 100) / 100, '#FF9999'],
-        [Math.round((minValueToPrint + ((maxValueToPrint - minValueToPrint) * 3 / 4)) * 100) / 100, '#FF6666'],
-        [Math.round(maxValueToPrint * 100) / 100, '#FF3333']
-    ];
+import Rainbow from "rainbowvis.js";
+
+export function getStops(poligonos, alfaNumerico, valueMapping) {
+    if (alfaNumerico) {
+        const rainbow = new Rainbow();
+        const uniques = Object.values(valueMapping);
+        
+        rainbow.setSpectrum('#ffdac8', '#FF3333');
+        rainbow.setNumberRange(0, uniques.length - 1);
+        const result = [];
+        for (let i = 0; i < uniques.length; i++) {
+            result.push([parseFloat(i), '#' + rainbow.colorAt(i)]);
+        }
+        return result;
+    } else {
+
+        const maxValueToPrint = parseFloat(poligonos.features.reduce((maxValue, obj) => {
+            return obj.properties.value > maxValue ? obj.properties.value : maxValue;
+        }, -Infinity));
+        const minValueToPrint = parseFloat(poligonos.features.reduce((maxValue, obj) => {
+            return obj.properties.value < maxValue ? obj.properties.value : maxValue;
+        }, Infinity));
+        const inter = maxValueToPrint - minValueToPrint;
+        return [
+            [Math.round(minValueToPrint * 100) / 100, '#ffdac8'],
+            [Math.round((minValueToPrint + (inter * 0.25)) * 100) / 100, '#FFCCCC'],
+            [Math.round((minValueToPrint + (inter * 0.5)) * 100) / 100, '#FF9999'],
+            [Math.round((minValueToPrint + (inter * 0.75)) * 100) / 100, '#FF6666'],
+            [Math.round(maxValueToPrint * 100) / 100, '#FF3333']
+        ];
+    }
 }
 function filterCsvByParams(objects, params, puntero) {
     if (!objects) return 'NaN';
@@ -41,8 +58,6 @@ export function getParamName(codelist) {
 export function getUrnCL(param, dimensions) {
     if (param === "TEMPORAL") return param;
     for (const dimension of dimensions) {
-        console.log(dimension.id);
-        console.log(param);
         if (dimension.id === param) {
             return dimension.localRepresentation.enumeration;
         }
@@ -97,16 +112,38 @@ export function getAllValues(csvParams, results, punteros) {
     return allValues;
 }
 
-export function populatePoligonos(poligonos, csvLookup, csvParams, punteros) {
+export function getValueMapping(results) {
+    let uniques;
+    const valueMapping = {};
+    uniques = Array.from(new Set(results));
+    uniques.shift();
+    uniques.pop();
+    for (let i = 0; i < uniques.length; i++) {
+        valueMapping[i] = uniques[i];
+    }
+    return valueMapping;
+}
+
+export function populatePoligonos(poligonos, csvLookup, csvParams, punteros, alfaNumerico, valueMapping) {
+    const valueInverse = {};
+    for (const key in valueMapping){
+        valueInverse[valueMapping[key]] = key;
+    }
     poligonos.features.forEach(obj => {
         const cod = obj.properties.cod;
-        const value = parseFloat(filterCsvByParams(csvLookup[cod], csvParams, punteros.OBS_VALUE).replace(',', '.'));
-        obj.properties.value = Math.round(value * 100) / 100;
+        const value = filterCsvByParams(csvLookup[cod], csvParams, punteros.OBS_VALUE).replace(',', '.');
+        if (alfaNumerico) {
+            obj.properties.value = parseInt(valueInverse[value]);
+            obj.properties.display = value;
+        } else {
+            obj.properties.value = Math.round(parseFloat(value) * 100) / 100;
+            obj.properties.display = obj.properties.value;
+        }
     });
 }
 
-export function updateMap(poligonos, map, setLegendValues) {
-    const stops = getStops(poligonos);
+export function updateMap(poligonos, map, setLegendValues, alfaNumerico, valueMapping) {
+    const stops = getStops(poligonos, alfaNumerico, valueMapping);
     map.current.getSource('dataset-source').setData(poligonos);
     setLegendValues(stops);
     map.current.setPaintProperty('dataset-layer-fill', 'fill-color', {
