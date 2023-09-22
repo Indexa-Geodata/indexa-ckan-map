@@ -4,7 +4,7 @@ export function getStops(poligonos, alfaNumerico, valueMapping) {
     if (alfaNumerico) {
         const rainbow = new Rainbow();
         const uniques = Object.values(valueMapping);
-        
+
         rainbow.setSpectrum('#ffdac8', '#FF3333');
         rainbow.setNumberRange(0, uniques.length - 1);
         const result = [];
@@ -64,11 +64,39 @@ export function getUrnCL(param, dimensions) {
     }
 }
 
+export function getUrnEcConceptId(param, dimensions) {
+    if (param === "TEMPORAL") return [param, param];
+    for (const dimension of dimensions) {
+        if (dimension.id === param) {
+            const fullUrn = dimension.conceptIdentity;
+            const lastPointIndex = fullUrn.lastIndexOf('.');
+            return [fullUrn.substring(0, lastPointIndex).replace('conceptscheme.Concept=', 'conceptscheme.ConceptScheme='), fullUrn.substring(lastPointIndex + 1)];
+        }
+    }
+}
+
 export function getCodelist(urn, dsd) {
     if (urn === 'TEMPORAL') return { 'name': 'Periodo' };
     for (const codelist of dsd.data.codelists) {
         if (codelist.links[0].urn === urn) {
             return codelist;
+        }
+    }
+}
+
+export function getConceptScheme(urn, dsd) {
+    if (urn === 'TEMPORAL') return { 'name': 'Periodo' };
+    for (const cs of dsd.data.conceptSchemes) {
+        if (cs.links[0].urn === urn) {
+            return cs;
+        }
+    }
+}
+export function getConceptName(conceptScheme, conceptId) {
+    if (conceptScheme.name === 'Periodo') return 'Periodo';
+    for (const concept of conceptScheme.concepts) {
+        if (concept.id === conceptId) {
+            return concept.name;
         }
     }
 }
@@ -126,7 +154,7 @@ export function getValueMapping(results) {
 
 export function populatePoligonos(poligonos, csvLookup, csvParams, punteros, alfaNumerico, valueMapping) {
     const valueInverse = {};
-    for (const key in valueMapping){
+    for (const key in valueMapping) {
         valueInverse[valueMapping[key]] = key;
     }
     poligonos.features.forEach(obj => {

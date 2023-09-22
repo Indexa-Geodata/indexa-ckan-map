@@ -3,7 +3,7 @@ import mapboxgl from "mapbox-gl";
 import municipios from './municipios.json';
 import provincias from './provincias.json';
 import Papa from 'papaparse';
-import { getStops, getDimensions, getUrnCL, getCodelist, getParamName, getCodeName, getPunteros, getCodToKeep, getAllValues, populatePoligonos, updateMap, getValueMapping } from './Utils';
+import { getStops, getDimensions, getUrnCL, getCodelist, getParamName, getCodeName, getPunteros, getCodToKeep, getAllValues, populatePoligonos, updateMap, getValueMapping, getUrnEcConceptId, getConceptName, getConceptScheme } from './Utils';
 
 const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN;
 const URL_RESOURCES = process.env.REACT_APP_URL_RESOURCES;
@@ -35,7 +35,7 @@ export default function Map() {
             map.current = new mapboxgl.Map({
                 container: mapContainer.current,
                 style: 'mapbox://styles/mapbox/dark-v11',
-                center: [-5.984040411639227, 37.38862867862967],
+                center: [-4.57566598846433, 37.46330540581251],
                 zoom: 7.0
             });
         }
@@ -61,7 +61,7 @@ export default function Map() {
                             punteros = getPunteros(results);
                             for (const puntero in punteros) {
                                 if (puntero.includes('TERRITORIO'))
-                                    territorioName = puntero
+                                    territorioName = puntero;
                                 if (!puntero.includes('TERRITORIO') && puntero !== 'OBS_VALUE') {
                                     csvParams[puntero] = results.data[1][punteros[puntero]];
                                 }
@@ -110,10 +110,13 @@ export default function Map() {
         for (const param in csvParams) {
             if (allValues[param].length <= 1) continue;
             const dimensions = getDimensions(dsd);
-            // console.log(dimensions);
             const urnCl = getUrnCL(param, dimensions);
+            const [urnEc, conceptId] = getUrnEcConceptId(param, dimensions);
+            const conceptScheme = getConceptScheme(urnEc, dsd);
+            const conceptName = getConceptName(conceptScheme, conceptId);
             const codelist = getCodelist(urnCl, dsd);
             const paramName = getParamName(codelist);
+            if (conceptName === null) console.log(urnEc);
             const paramSelect = document.createElement('select');
             paramSelect.toggleAttribute('class', 'form-select');
             paramSelect.toggleAttribute('aria-label', 'Default select example');
@@ -126,7 +129,7 @@ export default function Map() {
                 option.textContent = getCodeName(codelist, paramValues);
                 paramSelect.appendChild(option);
             }
-            paramText.textContent = `${paramName}:`;
+            paramText.textContent = `${conceptName}:`;
             paramSelect.addEventListener('change', event => {
                 const selectedOptionTag = event.target.selectedOptions[0];
                 const selectedOption = selectedOptionTag.getAttribute('code');
@@ -163,7 +166,6 @@ export default function Map() {
         const popup = new mapboxgl.Popup({
             closeButton: false
         });
-        console.log(valueMapping);
         map.current.on('load', () => {
             createFilters();
             const stops = getStops(poligonos, alfaNumerico, valueMapping);
@@ -215,7 +217,6 @@ export default function Map() {
     }, [map, dsd, csvLookup, poligonos, allValues, csvParams, alfaNumerico, createFilters, fetchCsv, fetchJson, urlCsv, urlJson, valueMapping]);
 
     const displayLegend = (legendValues) => {
-        console.log(valueMapping);
         return (
             <>
                 <div className="colores">
