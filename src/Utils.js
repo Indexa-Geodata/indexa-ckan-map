@@ -9,7 +9,7 @@ export function getStops(poligonos, alfaNumerico, valueMapping) {
         rainbow.setNumberRange(0, uniques.length - 1);
         const result = [];
         for (let i = 0; i < uniques.length; i++) {
-            result.push([parseFloat(i), '#' + rainbow.colorAt(i)]);
+            result.push([parseFloat(i), '#' + rainbow.colorAt(i), uniques[i]]);
         }
         return result;
     } else {

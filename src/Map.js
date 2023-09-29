@@ -19,6 +19,7 @@ export default function Map() {
     let punteros = {};
     let dsd = {};
     const [legendValues, setLegendValues] = useState([[0], [0], [0], [0], [0]]);
+    const [displayValues, setDisplayValues] = useState([[0] , [0], [0], [0], [0]]);
     let poligonos = provincias;
     let territorioName = null;
     let alfaNumerico = false;
@@ -38,6 +39,7 @@ export default function Map() {
                 center: [-4.57566598846433, 37.46330540581251],
                 zoom: 7.0
             });
+            map.current.addControl(new mapboxgl.NavigationControl());
         }
     }, [map]);
 
@@ -45,6 +47,10 @@ export default function Map() {
     //     setStops(getStops(poligonos, alfaNumerico));
     //     setLegendValues(stops);
     // }, [poligonos, alfaNumerico]);
+    const updateValues = (legendValues) =>{
+        console.log(legendValues);
+
+    };
 
     const fetchJson = (urlJson) => {
         if (Object.keys(dsd) !== 0)
@@ -140,18 +146,6 @@ export default function Map() {
                 updateMap(poligonos, map, setLegendValues, alfaNumerico, valueMapping);
             });
 
-            const selectProMun = document.getElementById('provmun');
-            selectProMun.addEventListener('change', event => {
-                const newPoligonos = event.target.value;
-                if (newPoligonos === 'Provincias') {
-                    poligonos = provincias;
-                } else {
-                    poligonos = municipios;
-                }
-                populatePoligonos(poligonos, csvLookup, csvParams, punteros, alfaNumerico, valueMapping);
-                updateMap(poligonos, map, setLegendValues, alfaNumerico, valueMapping);
-
-            });
             filter.appendChild(paramText);
             filter.appendChild(paramSelect);
         }
@@ -160,7 +154,6 @@ export default function Map() {
         if (!map.current) return;
         fetchJson(urlJson);
         fetchCsv(urlCsv);
-
         if (!dsd) return;
         if (!csvLookup) return;
         const popup = new mapboxgl.Popup({
@@ -168,8 +161,22 @@ export default function Map() {
         });
         map.current.on('load', () => {
             createFilters();
-            const stops = getStops(poligonos, alfaNumerico, valueMapping);
+            let stops;
+            if (alfaNumerico){
+                const aux = getStops(poligonos, alfaNumerico, valueMapping);
+                stops = []
+                const legendValueAux = []
+                for (const stop of aux){
+                    stops.push([stop[0], stop[1]]);
+                    legendValueAux.push([stop[2],stop[1]]);
+                }
+                setLegendValues(legendValueAux);
+
+            }else{
+            stops = getStops(poligonos, alfaNumerico, valueMapping);
             setLegendValues(stops);
+            }
+            
             map.current.addSource('dataset-source', {
                 'type': 'geojson',
                 'data': poligonos,
@@ -202,11 +209,10 @@ export default function Map() {
         map.current.on('mousemove', 'dataset-layer-fill', (e) => {
             map.current.getCanvas().style.cursor = 'pointer';
             const feature = e.features[0]
-
+            const html = feature.properties.display !== 'NaN' ? `<p>${feature.properties.nombre}</p><p>${feature.properties.display}</p>` : `<p>${feature.properties.nombre}</p>`;
             popup
                 .setLngLat(e.lngLat)
-                .setHTML(`<p>${feature.properties.nombre}</p><p>${feature.properties.display}</p>`
-                )
+                .setHTML(html)
                 .addTo(map.current);
 
         });
@@ -237,15 +243,6 @@ export default function Map() {
         <div>
             <div ref={mapContainer} className="map-container" id='map-container' />
             <div className="filter" id="filter" >
-                <p>Unidad territorial:</p>
-                <select id='provmun'>
-                    <option value="Provincias">
-                        Provincias
-                    </option>
-                    <option value="Municipios">
-                        Municipios
-                    </option>
-                </select>
             </div>
             <nav className="legend" id="legend">
                 {displayLegend(legendValues)}
