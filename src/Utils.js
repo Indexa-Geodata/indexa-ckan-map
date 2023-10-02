@@ -1,19 +1,39 @@
-export function getStops(poligonos) {
-    const maxValueToPrint = poligonos.features.reduce((maxValue, obj) => {
-        return obj.properties.value > maxValue ? obj.properties.value : maxValue;
-    }, -Infinity);
-    const minValueToPrint = poligonos.features.reduce((maxValue, obj) => {
-        return obj.properties.value < maxValue ? obj.properties.value : maxValue;
-    }, Infinity);
-    return [
-        [minValueToPrint, '#ffdac8'],
-        [Math.round(minValueToPrint + ((maxValueToPrint - minValueToPrint) * 1 / 5)), '#FFCCCC'],
-        [Math.round(minValueToPrint + ((maxValueToPrint - minValueToPrint) * 2 / 5)), '#FF9999'],
-        [Math.round(minValueToPrint + ((maxValueToPrint - minValueToPrint) * 3 / 5)), '#FF6666'],
-        [Math.round(minValueToPrint + ((maxValueToPrint - minValueToPrint) * 4 / 5)), '#FF3333']
-    ];
+import Rainbow from "rainbowvis.js";
+
+export function getStops(poligonos, alfaNumerico, valueMapping) {
+    if (alfaNumerico) {
+        const rainbow = new Rainbow();
+        const uniques = Object.values(valueMapping);
+
+        rainbow.setSpectrum('#ffdac8', '#FF3333');
+        rainbow.setNumberRange(0, uniques.length - 1);
+        const result = [];
+        for (let i = 0; i < uniques.length; i++) {
+            result.push([parseFloat(i), '#' + rainbow.colorAt(i), uniques[i]]);
+        }
+        return result;
+    } else {
+
+        const maxValueToPrint = parseFloat(poligonos.features.reduce((maxValue, obj) => {
+            return obj.properties.value > maxValue ? obj.properties.value : maxValue;
+        }, -Infinity));
+        const minValueToPrint = parseFloat(poligonos.features.reduce((maxValue, obj) => {
+            return obj.properties.value < maxValue ? obj.properties.value : maxValue;
+        }, Infinity));
+        const inter = maxValueToPrint - minValueToPrint;
+        if (maxValueToPrint === -Infinity) {
+            return [[0], [0], [0], [0], [0]];
+        }
+        return [
+            [Math.round(minValueToPrint * 100) / 100, '#ffdac8'],
+            [Math.round((minValueToPrint + (inter * 0.25)) * 100) / 100, '#FFCCCC'],
+            [Math.round((minValueToPrint + (inter * 0.5)) * 100) / 100, '#FF9999'],
+            [Math.round((minValueToPrint + (inter * 0.75)) * 100) / 100, '#FF6666'],
+            [Math.round(maxValueToPrint * 100) / 100, '#FF3333']
+        ];
+    }
 }
-export function filterCsvByParams(objects, params, puntero) {
+function filterCsvByParams(objects, params, puntero) {
     if (!objects) return 'NaN';
     let hasAllParams;
     for (const obj of objects) {
@@ -39,7 +59,7 @@ export function getParamName(codelist) {
 
 
 export function getUrnCL(param, dimensions) {
-    if (param === "TIME_PERIOD") return param;
+    if (param === "TEMPORAL") return param;
     for (const dimension of dimensions) {
         if (dimension.id === param) {
             return dimension.localRepresentation.enumeration;
@@ -47,8 +67,19 @@ export function getUrnCL(param, dimensions) {
     }
 }
 
+export function getUrnEcConceptId(param, dimensions) {
+    if (param === "TEMPORAL") return [param, param];
+    for (const dimension of dimensions) {
+        if (dimension.id === param) {
+            const fullUrn = dimension.conceptIdentity;
+            const lastPointIndex = fullUrn.lastIndexOf('.');
+            return [fullUrn.substring(0, lastPointIndex).replace('conceptscheme.Concept=', 'conceptscheme.ConceptScheme='), fullUrn.substring(lastPointIndex + 1)];
+        }
+    }
+}
+
 export function getCodelist(urn, dsd) {
-    if (urn === 'TIME_PERIOD') return { 'name': 'Año' };
+    if (urn === 'TEMPORAL') return { 'name': 'Periodo' };
     for (const codelist of dsd.data.codelists) {
         if (codelist.links[0].urn === urn) {
             return codelist;
@@ -56,8 +87,25 @@ export function getCodelist(urn, dsd) {
     }
 }
 
+export function getConceptScheme(urn, dsd) {
+    if (urn === 'TEMPORAL') return { 'name': 'Periodo' };
+    for (const cs of dsd.data.conceptSchemes) {
+        if (cs.links[0].urn === urn) {
+            return cs;
+        }
+    }
+}
+export function getConceptName(conceptScheme, conceptId) {
+    if (conceptScheme.name === 'Periodo') return 'Periodo';
+    for (const concept of conceptScheme.concepts) {
+        if (concept.id === conceptId) {
+            return concept.name;
+        }
+    }
+}
+
 export function getCodeName(codelist, codeId) {
-    if (codelist.name === 'Año') return codeId;
+    if (codelist.name === 'Periodo') return codeId;
     for (const code of codelist.codes) {
         if (code.id === codeId) {
             return code.name;
@@ -87,7 +135,7 @@ export function getCodToKeep(municipios, provincias) {
 
 export function getAllValues(csvParams, results, punteros) {
     const allValues = {};
-    for (const param in csvParams) {
+    for (let param of Object.keys(csvParams)) {
         allValues[param] = Array.from(new Set(results.data.map(subArray => subArray[punteros[param]])));
         allValues[param].shift();
         allValues[param].pop();
@@ -95,17 +143,53 @@ export function getAllValues(csvParams, results, punteros) {
     return allValues;
 }
 
-export function populatePoligonos(poligonos, csvLookup, csvParams, punteros) {
-    poligonos.features.forEach(obj => {
-        const cod = obj.properties.cod;
-        obj.properties.value = parseFloat(filterCsvByParams(csvLookup[cod], csvParams, punteros.OBS_VALUE));
-    });
+export function getValueMapping(results) {
+    let uniques;
+    const valueMapping = {};
+    uniques = Array.from(new Set(results));
+    uniques.shift();
+    uniques.pop();
+    for (let i = 0; i < uniques.length; i++) {
+        valueMapping[i] = uniques[i];
+    }
+    return valueMapping;
 }
 
-export function updateMap(poligonos, map, setLegendValues) {
-    const stops = getStops(poligonos);
+export function populatePoligonos(poligonos, csvLookup, csvParams, punteros, alfaNumerico, valueMapping) {
+    const valueInverse = {};
+    for (const key in valueMapping) {
+        valueInverse[valueMapping[key]] = key;
+    }
+    poligonos.features.forEach(obj => {
+        const cod = obj.properties.cod;
+        console.log(csvLookup[cod]);
+        const value = filterCsvByParams(csvLookup[cod], csvParams, punteros.OBS_VALUE).replace(',', '.');
+        if (alfaNumerico) {
+            obj.properties.value = parseInt(valueInverse[value]);
+            obj.properties.display = value;
+        } else {
+            obj.properties.value = Math.round(parseFloat(value) * 100) / 100;
+            obj.properties.display = obj.properties.value;
+        }
+    });
+}
+export function updateMap(poligonos, map, setLegendValues, alfaNumerico, valueMapping) {
+    let stops;
     map.current.getSource('dataset-source').setData(poligonos);
-    setLegendValues(stops);
+    if (alfaNumerico) {
+        const aux = getStops(poligonos, alfaNumerico, valueMapping);
+        stops = []
+        const legendValueAux = []
+        for (const stop of aux) {
+            stops.push([stop[0], stop[1]]);
+            legendValueAux.push([stop[2], stop[1]]);
+        }
+        setLegendValues(legendValueAux);
+
+    } else {
+        stops = getStops(poligonos, alfaNumerico, valueMapping);
+        setLegendValues(stops);
+    }
     map.current.setPaintProperty('dataset-layer-fill', 'fill-color', {
         "property": "value",
         "stops": stops
