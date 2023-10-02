@@ -38,7 +38,7 @@
     position: absolute;
     bottom: 35px;
     right: 0;
-    width: clamp(250px,20%,400px);
+    width: clamp(250px,40%,800px);
     background-color: white;
     float: left;
     text-align: center;

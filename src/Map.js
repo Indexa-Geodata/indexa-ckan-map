@@ -19,7 +19,7 @@ export default function Map() {
     let punteros = {};
     let dsd = {};
     const [legendValues, setLegendValues] = useState([[0], [0], [0], [0], [0]]);
-    const [displayValues, setDisplayValues] = useState([[0] , [0], [0], [0], [0]]);
+    const [displayValues, setDisplayValues] = useState([[0], [0], [0], [0], [0]]);
     let poligonos = provincias;
     let territorioName = null;
     let alfaNumerico = false;
@@ -47,7 +47,7 @@ export default function Map() {
     //     setStops(getStops(poligonos, alfaNumerico));
     //     setLegendValues(stops);
     // }, [poligonos, alfaNumerico]);
-    const updateValues = (legendValues) =>{
+    const updateValues = (legendValues) => {
         console.log(legendValues);
 
     };
@@ -83,7 +83,13 @@ export default function Map() {
                                     csvLookup[row[punteros[territorioName]]][csvLookup[row[punteros[territorioName]]].length] = row;
                                 }
                             });
-                            const firstPolygon = Object.keys(csvLookup)[0];
+                            let firstPolygon;
+                            for (const polygon of Object.keys(csvLookup)) {
+                                if (polygon != '108' && polygon != 'C01') {
+                                    firstPolygon = polygon;
+                                    break;
+                                }
+                            }
                             let dataHasProvincias = false;
                             for (const provincia of provincias.features) {
                                 if (provincia.properties.cod === firstPolygon) {
@@ -162,21 +168,21 @@ export default function Map() {
         map.current.on('load', () => {
             createFilters();
             let stops;
-            if (alfaNumerico){
+            if (alfaNumerico) {
                 const aux = getStops(poligonos, alfaNumerico, valueMapping);
                 stops = []
                 const legendValueAux = []
-                for (const stop of aux){
+                for (const stop of aux) {
                     stops.push([stop[0], stop[1]]);
-                    legendValueAux.push([stop[2],stop[1]]);
+                    legendValueAux.push([stop[2], stop[1]]);
                 }
                 setLegendValues(legendValueAux);
 
-            }else{
-            stops = getStops(poligonos, alfaNumerico, valueMapping);
-            setLegendValues(stops);
+            } else {
+                stops = getStops(poligonos, alfaNumerico, valueMapping);
+                setLegendValues(stops);
             }
-            
+
             map.current.addSource('dataset-source', {
                 'type': 'geojson',
                 'data': poligonos,
@@ -209,7 +215,7 @@ export default function Map() {
         map.current.on('mousemove', 'dataset-layer-fill', (e) => {
             map.current.getCanvas().style.cursor = 'pointer';
             const feature = e.features[0]
-            const html = feature.properties.display !== 'NaN' ? `<p>${feature.properties.nombre}</p><p>${feature.properties.display}</p>` : `<p>${feature.properties.nombre}</p>`;
+            const html = feature.properties.display !== 'NaN' && feature.properties.display !== undefined ? `<p>${feature.properties.nombre}</p><p>${feature.properties.display}</p>` : `<p>${feature.properties.nombre}</p>`;
             popup
                 .setLngLat(e.lngLat)
                 .setHTML(html)

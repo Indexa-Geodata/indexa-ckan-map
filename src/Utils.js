@@ -21,6 +21,9 @@ export function getStops(poligonos, alfaNumerico, valueMapping) {
             return obj.properties.value < maxValue ? obj.properties.value : maxValue;
         }, Infinity));
         const inter = maxValueToPrint - minValueToPrint;
+        if (maxValueToPrint === -Infinity) {
+            return [[0], [0], [0], [0], [0]];
+        }
         return [
             [Math.round(minValueToPrint * 100) / 100, '#ffdac8'],
             [Math.round((minValueToPrint + (inter * 0.25)) * 100) / 100, '#FFCCCC'],
@@ -159,6 +162,7 @@ export function populatePoligonos(poligonos, csvLookup, csvParams, punteros, alf
     }
     poligonos.features.forEach(obj => {
         const cod = obj.properties.cod;
+        console.log(csvLookup[cod]);
         const value = filterCsvByParams(csvLookup[cod], csvParams, punteros.OBS_VALUE).replace(',', '.');
         if (alfaNumerico) {
             obj.properties.value = parseInt(valueInverse[value]);
@@ -169,11 +173,23 @@ export function populatePoligonos(poligonos, csvLookup, csvParams, punteros, alf
         }
     });
 }
-
 export function updateMap(poligonos, map, setLegendValues, alfaNumerico, valueMapping) {
-    const stops = getStops(poligonos, alfaNumerico, valueMapping);
+    let stops;
     map.current.getSource('dataset-source').setData(poligonos);
-    setLegendValues(stops);
+    if (alfaNumerico) {
+        const aux = getStops(poligonos, alfaNumerico, valueMapping);
+        stops = []
+        const legendValueAux = []
+        for (const stop of aux) {
+            stops.push([stop[0], stop[1]]);
+            legendValueAux.push([stop[2], stop[1]]);
+        }
+        setLegendValues(legendValueAux);
+
+    } else {
+        stops = getStops(poligonos, alfaNumerico, valueMapping);
+        setLegendValues(stops);
+    }
     map.current.setPaintProperty('dataset-layer-fill', 'fill-color', {
         "property": "value",
         "stops": stops
