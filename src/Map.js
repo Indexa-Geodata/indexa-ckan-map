@@ -128,7 +128,6 @@ export default function Map() {
             const conceptName = getConceptName(conceptScheme, conceptId);
             const codelist = getCodelist(urnCl, dsd);
             const paramName = getParamName(codelist);
-            if (conceptName === null) console.log(urnEc);
             const paramSelect = document.createElement('select');
             paramSelect.toggleAttribute('class', 'form-select');
             paramSelect.toggleAttribute('aria-label', 'Default select example');

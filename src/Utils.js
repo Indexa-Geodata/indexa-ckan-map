@@ -22,7 +22,7 @@ export function getStops(poligonos, alfaNumerico, valueMapping) {
         }, Infinity));
         const inter = maxValueToPrint - minValueToPrint;
         if (maxValueToPrint === -Infinity) {
-            return [[0], [0], [0], [0], [0]];
+            return [[0, '#000000'], [0, '#000000'], [0, '#000000'], [0, '#000000'], [0, '#000000']];
         }
         return [
             [Math.round(minValueToPrint * 100) / 100, '#ffdac8'],
@@ -162,7 +162,6 @@ export function populatePoligonos(poligonos, csvLookup, csvParams, punteros, alf
     }
     poligonos.features.forEach(obj => {
         const cod = obj.properties.cod;
-        console.log(csvLookup[cod]);
         const value = filterCsvByParams(csvLookup[cod], csvParams, punteros.OBS_VALUE).replace(',', '.');
         if (alfaNumerico) {
             obj.properties.value = parseInt(valueInverse[value]);
