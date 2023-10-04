@@ -123,6 +123,7 @@ export default function Map() {
             if (allValues[param].length <= 1) continue;
             const dimensions = getDimensions(dsd);
             const urnCl = getUrnCL(param, dimensions);
+            console.log(param);
             const [urnEc, conceptId] = getUrnEcConceptId(param, dimensions);
             const conceptScheme = getConceptScheme(urnEc, dsd);
             const conceptName = getConceptName(conceptScheme, conceptId);
@@ -140,7 +141,7 @@ export default function Map() {
                 option.textContent = getCodeName(codelist, paramValues);
                 paramSelect.appendChild(option);
             }
-            paramText.textContent = `${conceptName}:`;
+            paramText.textContent = conceptName === '[name]' ? `${paramName}` : `${conceptName}:`;
             paramSelect.addEventListener('change', event => {
                 const selectedOptionTag = event.target.selectedOptions[0];
                 const selectedOption = selectedOptionTag.getAttribute('code');
