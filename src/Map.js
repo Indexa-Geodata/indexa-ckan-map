@@ -47,10 +47,6 @@ export default function Map() {
     //     setStops(getStops(poligonos, alfaNumerico));
     //     setLegendValues(stops);
     // }, [poligonos, alfaNumerico]);
-    const updateValues = (legendValues) => {
-        console.log(legendValues);
-
-    };
 
     const fetchJson = (urlJson) => {
         if (Object.keys(dsd) !== 0)
@@ -123,7 +119,6 @@ export default function Map() {
             if (allValues[param].length <= 1) continue;
             const dimensions = getDimensions(dsd);
             const urnCl = getUrnCL(param, dimensions);
-            console.log(param);
             const [urnEc, conceptId] = getUrnEcConceptId(param, dimensions);
             const conceptScheme = getConceptScheme(urnEc, dsd);
             const conceptName = getConceptName(conceptScheme, conceptId);

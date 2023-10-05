@@ -70,14 +70,12 @@ export function getUrnCL(param, dimensions) {
 export function getUrnEcConceptId(param, dimensions) {
     if (param === "TEMPORAL") return [param, param];
     for (const dimension of dimensions) {
-        console.log(dimension.id);
         if (dimension.id === param) {
             const fullUrn = dimension.conceptIdentity;
             const lastPointIndex = fullUrn.lastIndexOf('.');
             return [fullUrn.substring(0, lastPointIndex).replace('conceptscheme.Concept=', 'conceptscheme.ConceptScheme='), fullUrn.substring(lastPointIndex + 1)];
         }
     }
-    console.log('malamente');
 }
 
 export function getCodelist(urn, dsd) {
