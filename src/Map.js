@@ -161,9 +161,6 @@ export default function Map() {
             closeButton: false
         });
         map.current.on('load', () => {
-            console.log(dsd);
-            console.log(csvLookup);
-            console.log(poligonos);
             createFilters();
             let stops;
             if (alfaNumerico) {
